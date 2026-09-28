@@ -9,7 +9,7 @@ import androidx.glance.background
 import androidx.glance.action.ActionParameters
 import androidx.glance.action.actionParametersOf
 import androidx.glance.action.actionStartActivity
-import androidx.glance.appwidget.CheckBox
+import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.GlanceAppWidgetReceiver
 import androidx.glance.appwidget.provideContent
@@ -17,6 +17,7 @@ import androidx.glance.appwidget.action.ActionCallback
 import androidx.glance.appwidget.action.actionRunCallback
 import androidx.glance.layout.Column
 import androidx.glance.layout.fillMaxSize
+import androidx.glance.layout.fillMaxWidth
 import androidx.glance.layout.padding
 import androidx.glance.text.Text
 import androidx.glance.unit.ColorProvider
@@ -45,12 +46,11 @@ class DayWidget : GlanceAppWidget() {
             Text("היום · $dateLabel", style = TextStyle(color = ColorProvider(Color.Black), fontSize = 18.sp))
             if (routines.isEmpty()) Text("הוסף רוטינות באפליקציה")
             routines.forEach { routine ->
-                CheckBox(
-                    checked = routine.done,
-                    onCheckedChange = actionRunCallback<ToggleRoutineAction>(
-                        actionParametersOf(routineKey to routine.routineId)
-                    ),
-                    text = routine.title,
+                Text(
+                    text = "${if (routine.done) "☑" else "☐"}  ${routine.title}",
+                    modifier = GlanceModifier.fillMaxWidth().clickable(
+                        actionRunCallback<ToggleRoutineAction>(actionParametersOf(routineKey to routine.routineId))
+                    ).padding(vertical = 8.dp),
                     style = TextStyle(color = ColorProvider(Color.Black), fontSize = 16.sp),
                     maxLines = 1,
                 )

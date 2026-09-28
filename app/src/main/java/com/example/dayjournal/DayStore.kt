@@ -131,7 +131,7 @@ class DayRepository(context: Context) {
     private val dao = db.dao()
 
     private suspend fun ensureDay(date: LocalDate) = db.withTransaction {
-        if (date > activeDay()) return@withTransaction
+        if (date != activeDay()) return@withTransaction
         val day = date.toString()
         dao.addEntry(DayEntry(day))
         if (dao.routines(day).isEmpty()) {
