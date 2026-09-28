@@ -41,7 +41,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
-import androidx.glance.appwidget.updateAll
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.time.LocalDate
@@ -93,7 +92,7 @@ private fun JournalApp(startEvening: Boolean) {
             val date = activeDay()
             if (date != currentDate) {
                 currentDate = date
-                DayWidget().updateAll(context)
+                DayWidgetReceiver.updateAll(context)
             }
             revision++
             delay(60_000)
@@ -109,7 +108,7 @@ private fun JournalApp(startEvening: Boolean) {
         scope.launch {
             block()
             revision++
-            DayWidget().updateAll(context)
+            DayWidgetReceiver.updateAll(context)
             after()
         }
     }

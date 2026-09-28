@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TextView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_routine_title"
+    android:layout_width="match_parent"
+    android:layout_height="38dp"
+    android:gravity="right|center_vertical"
+    android:layoutDirection="rtl"
+    android:textColor="#202020"
+    android:textDirection="rtl"
+    android:textSize="21sp" />

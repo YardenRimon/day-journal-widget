@@ -30,7 +30,6 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     implementation("androidx.activity:activity-compose:1.13.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
-    implementation("androidx.glance:glance-appwidget:1.2.0")
     implementation("androidx.room:room-runtime:2.8.5")
     implementation("androidx.room:room-ktx:2.8.5")
     ksp("androidx.room:room-compiler:2.8.5")

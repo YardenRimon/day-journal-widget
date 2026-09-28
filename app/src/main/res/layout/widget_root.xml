@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_background"
+    android:layoutDirection="rtl"
+    android:orientation="vertical"
+    android:padding="18dp">
+
+    <TextView
+        android:id="@+id/widget_date"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="right|center_vertical"
+        android:text="יומן יום"
+        android:textColor="#202020"
+        android:textDirection="rtl"
+        android:textSize="24sp"
+        android:paddingBottom="10dp" />
+
+    <LinearLayout
+        android:id="@+id/widget_routines"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layoutDirection="rtl"
+        android:orientation="vertical" />
+
+    <TextView
+        android:id="@+id/widget_evening"
+        android:layout_width="wrap_content"
+        android:layout_height="52dp"
+        android:layout_gravity="start"
+        android:background="@drawable/widget_button_background"
+        android:gravity="center"
+        android:minWidth="154dp"
+        android:paddingHorizontal="18dp"
+        android:text="סיכום ערב"
+        android:textColor="#FFFFFF"
+        android:textDirection="rtl"
+        android:textSize="20sp" />
+</LinearLayout>

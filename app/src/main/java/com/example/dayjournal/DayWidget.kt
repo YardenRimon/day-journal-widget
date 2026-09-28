@@ -1,76 +1,107 @@
 package com.example.dayjournal
 
+import android.app.PendingIntent
+import android.appwidget.AppWidgetManager
+import android.appwidget.AppWidgetProvider
+import android.content.ComponentName
 import android.content.Context
-import androidx.compose.runtime.Composable
-import androidx.glance.GlanceId
-import androidx.glance.GlanceModifier
-import androidx.glance.Button
-import androidx.glance.background
-import androidx.glance.action.ActionParameters
-import androidx.glance.action.actionParametersOf
-import androidx.glance.action.actionStartActivity
-import androidx.glance.action.clickable
-import androidx.glance.appwidget.GlanceAppWidget
-import androidx.glance.appwidget.GlanceAppWidgetReceiver
-import androidx.glance.appwidget.provideContent
-import androidx.glance.appwidget.action.ActionCallback
-import androidx.glance.appwidget.action.actionRunCallback
-import androidx.glance.layout.Column
-import androidx.glance.layout.fillMaxSize
-import androidx.glance.layout.fillMaxWidth
-import androidx.glance.layout.padding
-import androidx.glance.text.Text
-import androidx.glance.unit.ColorProvider
-import androidx.glance.text.TextStyle
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import android.content.Intent
+import android.net.Uri
+import android.widget.RemoteViews
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
-private val routineKey = ActionParameters.Key<String>("routine_id")
-private val screenKey = ActionParameters.Key<String>("screen")
+private const val ACTION_TOGGLE = "com.example.dayjournal.TOGGLE_ROUTINE"
+private const val EXTRA_ROUTINE_ID = "routine_id"
+private val widgetScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+private val widgetMutex = Mutex()
+private val widgetDate = DateTimeFormatter.ofPattern("EEEE d/M", Locale.forLanguageTag("he"))
 
-class DayWidget : GlanceAppWidget() {
-    override suspend fun provideGlance(context: Context, id: GlanceId) {
-        val repository = DayRepository(context)
-        val date = activeDay()
-        val data = repository.day(date)
-        val label = date.format(DateTimeFormatter.ofPattern("EEEE d/M", Locale("he")))
-        provideContent { WidgetBody(label, data.routines) }
-    }
-
-    @Composable
-    private fun WidgetBody(dateLabel: String, routines: List<DayRoutine>) {
-        Column(modifier = GlanceModifier.fillMaxSize().background(Color.White).padding(12.dp)) {
-            Text("היום · $dateLabel", style = TextStyle(color = ColorProvider(Color.Black), fontSize = 18.sp))
-            if (routines.isEmpty()) Text("הוסף רוטינות באפליקציה")
-            routines.forEach { routine ->
-                Text(
-                    text = "${if (routine.done) "☑" else "☐"}  ${routine.title}",
-                    modifier = GlanceModifier.fillMaxWidth().clickable(
-                        actionRunCallback<ToggleRoutineAction>(actionParametersOf(routineKey to routine.routineId))
-                    ).padding(vertical = 8.dp),
-                    style = TextStyle(color = ColorProvider(Color.Black), fontSize = 16.sp),
-                    maxLines = 1,
-                )
+class DayWidgetReceiver : AppWidgetProvider() {
+    override fun onUpdate(context: Context, manager: AppWidgetManager, appWidgetIds: IntArray) {
+        val pending = goAsync()
+        widgetScope.launch {
+            try {
+                widgetMutex.withLock { appWidgetIds.forEach { render(context, manager, it) } }
+            } finally {
+                pending.finish()
             }
-            Button("סיכום ערב", onClick = actionStartActivity<MainActivity>(
-                actionParametersOf(screenKey to "evening")
-            ))
         }
     }
-}
 
-class ToggleRoutineAction : ActionCallback {
-    override suspend fun onAction(context: Context, glanceId: GlanceId, parameters: ActionParameters) {
-        val id = parameters[routineKey] ?: return
-        val repository = DayRepository(context)
-        repository.toggleRoutine(id)
-        DayWidget().update(context, glanceId)
+    override fun onReceive(context: Context, intent: Intent) {
+        if (intent.action != ACTION_TOGGLE) {
+            super.onReceive(context, intent)
+            return
+        }
+        val routineId = intent.getStringExtra(EXTRA_ROUTINE_ID) ?: return
+        val pending = goAsync()
+        widgetScope.launch {
+            try {
+                widgetMutex.withLock {
+                    DayRepository(context).toggleRoutine(routineId)
+                    renderAll(context)
+                }
+            } finally {
+                pending.finish()
+            }
+        }
     }
-}
 
-class DayWidgetReceiver : GlanceAppWidgetReceiver() {
-    override val glanceAppWidget: GlanceAppWidget = DayWidget()
+    companion object {
+        suspend fun updateAll(context: Context) {
+            widgetMutex.withLock { renderAll(context) }
+        }
+
+        private suspend fun renderAll(context: Context) {
+            val manager = AppWidgetManager.getInstance(context)
+            val widgetIds = manager.getAppWidgetIds(ComponentName(context, DayWidgetReceiver::class.java))
+            widgetIds.forEach { render(context, manager, it) }
+        }
+
+        private suspend fun render(context: Context, manager: AppWidgetManager, widgetId: Int) {
+            val date = activeDay()
+            val routines = DayRepository(context).day(date).routines
+            val views = RemoteViews(context.packageName, R.layout.widget_root)
+            views.setTextViewText(R.id.widget_date, "היום · ${date.format(widgetDate)}")
+            views.removeAllViews(R.id.widget_routines)
+            if (routines.isEmpty()) {
+                val empty = RemoteViews(context.packageName, R.layout.widget_routine_large)
+                empty.setTextViewText(R.id.widget_routine_title, "הוסף רוטינות באפליקציה")
+                views.addView(R.id.widget_routines, empty)
+            } else {
+                routines.forEach { routine ->
+                    val rowLayout = if (routines.size <= 3) R.layout.widget_routine_large else R.layout.widget_routine_compact
+                    val row = RemoteViews(context.packageName, rowLayout)
+                    row.setTextViewText(R.id.widget_routine_title, "${if (routine.done) "☑" else "☐"}  ${routine.title}")
+                    val toggle = Intent(context, DayWidgetReceiver::class.java).apply {
+                        action = ACTION_TOGGLE
+                        data = Uri.parse("dayjournal://widget/$widgetId/${routine.routineId}")
+                        putExtra(EXTRA_ROUTINE_ID, routine.routineId)
+                    }
+                    val action = PendingIntent.getBroadcast(
+                        context, 0, toggle, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                    )
+                    row.setOnClickPendingIntent(R.id.widget_routine_title, action)
+                    views.addView(R.id.widget_routines, row)
+                }
+            }
+            val evening = Intent(context, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                data = Uri.parse("dayjournal://widget/evening/$widgetId")
+                putExtra("screen", "evening")
+            }
+            views.setOnClickPendingIntent(
+                R.id.widget_evening,
+                PendingIntent.getActivity(context, 0, evening, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+            )
+            manager.updateAppWidget(widgetId, views)
+        }
+    }
 }
