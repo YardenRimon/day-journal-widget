@@ -45,11 +45,13 @@ import androidx.glance.appwidget.updateAll
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.time.LocalDate
+import java.time.YearMonth
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 private enum class Screen { TODAY, EVENING, JOURNAL, DAY, ROUTINES }
 private val hebrewDate = DateTimeFormatter.ofPattern("EEEE, d בMMMM yyyy", Locale("he"))
+private val hebrewMonth = DateTimeFormatter.ofPattern("MMMM yyyy", Locale("he"))
 private val wakeTimePattern = Regex("^([01][0-9]|2[0-3]):[0-5][0-9]$")
 
 class MainActivity : ComponentActivity() {
@@ -77,7 +79,7 @@ private fun JournalApp(startEvening: Boolean) {
     val repository = remember(context) { DayRepository(context) }
     val scope = rememberCoroutineScope()
     var currentDate by remember { mutableStateOf(activeDay()) }
-    var firstDate by remember { mutableStateOf(currentDate) }
+    var journalMonth by remember { mutableStateOf(YearMonth.from(currentDate)) }
     var screen by remember { mutableStateOf(if (startEvening) Screen.EVENING else Screen.TODAY) }
     var selectedDate by remember { mutableStateOf(currentDate) }
     var current by remember { mutableStateOf<DaySnapshot?>(null) }
@@ -102,7 +104,6 @@ private fun JournalApp(startEvening: Boolean) {
         tomorrow = repository.day(currentDate.plusDays(1))
         selected = repository.day(selectedDate)
         templates = repository.allTemplates()
-        firstDate = repository.firstDay()
     }
     fun commit(block: suspend () -> Unit, after: () -> Unit = {}) {
         scope.launch {
@@ -139,10 +140,17 @@ private fun JournalApp(startEvening: Boolean) {
                     TaskChecks(current?.tasks.orEmpty()) { task, done ->
                         commit(block = { repository.setTaskDone(task, done) })
                     }
+                    TodayTasksEditor(current?.tasks.orEmpty()) { titles ->
+                        commit(block = { repository.saveTasks(currentDate, titles) })
+                    }
                     current?.entry?.wakeTime?.takeIf { it.isNotEmpty() }?.let {
                         Text("שעת השכמה שתכננת: $it")
                     }
                     Button(onClick = { screen = Screen.EVENING }) { Text("סיכום יום ותכנון מחר") }
+                    OutlinedButton(onClick = {
+                        journalMonth = YearMonth.from(currentDate)
+                        screen = Screen.JOURNAL
+                    }) { Text("פתח יומן ימים") }
                 }
                 Screen.EVENING -> ScrollPage {
                     EveningPage(currentDate, current, tomorrow,
@@ -156,18 +164,27 @@ private fun JournalApp(startEvening: Boolean) {
                         }
                     )
                 }
-                Screen.JOURNAL -> {
-                    val days = generateSequence(currentDate) { date ->
-                        if (date > firstDate) date.minusDays(1) else null
-                    }.toList()
+                Screen.JOURNAL -> Column(modifier = Modifier.fillMaxSize()) {
+                    Text("יומן ימים", style = MaterialTheme.typography.titleLarge)
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        OutlinedButton(onClick = { journalMonth = journalMonth.minusMonths(1) }) { Text("קודם") }
+                        Text(journalMonth.format(hebrewMonth), modifier = Modifier.padding(top = 12.dp))
+                        OutlinedButton(onClick = { journalMonth = journalMonth.plusMonths(1) }) { Text("הבא") }
+                    }
+                    val days = (1..journalMonth.lengthOfMonth()).map(journalMonth::atDay).reversed()
                     LazyColumn(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         items(days) { date ->
                             Column(modifier = Modifier.fillMaxWidth().clickable {
                                 selectedDate = date
+                                selected = null
                                 screen = Screen.DAY
                             }.padding(vertical = 12.dp)) {
                                 Text(date.format(hebrewDate), style = MaterialTheme.typography.titleMedium)
-                                Text("פתח את היום", style = MaterialTheme.typography.bodySmall)
+                                Text(when (date) {
+                                    currentDate -> "היום · פתח יום"
+                                    currentDate.plusDays(1) -> "מחר · פתח יום"
+                                    else -> "פתח יום"
+                                }, style = MaterialTheme.typography.bodySmall)
                             }
                             HorizontalDivider()
                         }
@@ -175,6 +192,18 @@ private fun JournalApp(startEvening: Boolean) {
                 }
                 Screen.DAY -> ScrollPage {
                     Text(selectedDate.format(hebrewDate), style = MaterialTheme.typography.titleLarge)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(onClick = {
+                            selectedDate = selectedDate.minusDays(1)
+                            journalMonth = YearMonth.from(selectedDate)
+                            selected = null
+                        }) { Text("יום קודם") }
+                        OutlinedButton(onClick = {
+                            selectedDate = selectedDate.plusDays(1)
+                            journalMonth = YearMonth.from(selectedDate)
+                            selected = null
+                        }) { Text("יום הבא") }
+                    }
                     DayPage(selectedDate, selected,
                         onRoutine = { id, done -> commit(block = { repository.setRoutineDone(selectedDate, id, done) }) },
                         onTask = { task, done -> commit(block = { repository.setTaskDone(task, done) }) },
@@ -234,6 +263,35 @@ private fun TaskChecks(items: List<DayTask>, onChange: (DayTask, Boolean) -> Uni
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Checkbox(checked = item.done, onCheckedChange = { onChange(item, it) })
             Text(item.title, modifier = Modifier.padding(top = 12.dp))
+        }
+    }
+}
+
+@Composable
+private fun TodayTasksEditor(tasks: List<DayTask>, onSave: (List<String>) -> Unit) {
+    var editing by remember { mutableStateOf(false) }
+    var first by remember { mutableStateOf("") }
+    var second by remember { mutableStateOf("") }
+    var third by remember { mutableStateOf("") }
+
+    if (!editing) {
+        OutlinedButton(onClick = {
+            first = tasks.getOrNull(0)?.title.orEmpty()
+            second = tasks.getOrNull(1)?.title.orEmpty()
+            third = tasks.getOrNull(2)?.title.orEmpty()
+            editing = true
+        }) { Text(if (tasks.isEmpty()) "הוסף משימות להיום" else "ערוך משימות להיום") }
+    } else {
+        Text("עריכת משימות היום", style = MaterialTheme.typography.titleMedium)
+        OutlinedTextField(first, { first = it }, label = { Text("משימה 1") }, modifier = Modifier.fillMaxWidth())
+        OutlinedTextField(second, { second = it }, label = { Text("משימה 2") }, modifier = Modifier.fillMaxWidth())
+        OutlinedTextField(third, { third = it }, label = { Text("משימה 3") }, modifier = Modifier.fillMaxWidth())
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(onClick = {
+                onSave(listOf(first, second, third))
+                editing = false
+            }) { Text("שמור משימות") }
+            OutlinedButton(onClick = { editing = false }) { Text("ביטול") }
         }
     }
 }

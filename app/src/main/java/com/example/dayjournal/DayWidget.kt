@@ -14,7 +14,6 @@ import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.GlanceAppWidgetReceiver
 import androidx.glance.appwidget.provideContent
 import androidx.glance.appwidget.action.ActionCallback
-import androidx.glance.appwidget.action.ToggleableStateKey
 import androidx.glance.appwidget.action.actionRunCallback
 import androidx.glance.layout.Column
 import androidx.glance.layout.fillMaxSize
@@ -67,9 +66,7 @@ class ToggleRoutineAction : ActionCallback {
     override suspend fun onAction(context: Context, glanceId: GlanceId, parameters: ActionParameters) {
         val id = parameters[routineKey] ?: return
         val repository = DayRepository(context)
-        val checked = parameters[ToggleableStateKey]
-        if (checked == null) repository.toggleRoutine(id)
-        else repository.setRoutineDone(activeDay(), id, checked)
+        repository.toggleRoutine(id)
         DayWidget().update(context, glanceId)
     }
 }

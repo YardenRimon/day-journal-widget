@@ -167,9 +167,12 @@ class DayRepository(context: Context) {
     }
 
     suspend fun toggleRoutine(id: String) {
-        ensureCurrentDay()
-        val key = activeDay().toString()
-        dao.routine(key, id)?.let { dao.putRoutine(it.copy(done = !it.done)) }
+        val date = activeDay()
+        ensureDay(date)
+        db.withTransaction {
+            val key = date.toString()
+            dao.routine(key, id)?.let { dao.putRoutine(it.copy(done = !it.done)) }
+        }
     }
 
     suspend fun setTaskDone(task: DayTask, done: Boolean) = dao.putTask(task.copy(done = done))
