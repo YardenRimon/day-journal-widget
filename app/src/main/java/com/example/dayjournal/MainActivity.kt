@@ -129,7 +129,7 @@ private fun JournalApp(startEvening: Boolean) {
                 Screen.TODAY -> ScrollPage {
                     Text("רוטינות הבוקר", style = MaterialTheme.typography.titleLarge)
                     RoutineChecks(current?.routines.orEmpty(), currentDate) { date, id, done ->
-                        commit { repository.setRoutineDone(date, id, done) }
+                        commit(block = { repository.setRoutineDone(date, id, done) })
                     }
                     if (current?.routines?.isEmpty() == true) {
                         OutlinedButton(onClick = { screen = Screen.ROUTINES }) { Text("הוסף רוטינות") }
@@ -137,7 +137,7 @@ private fun JournalApp(startEvening: Boolean) {
                     HorizontalDivider()
                     Text("המשימות שלי היום", style = MaterialTheme.typography.titleLarge)
                     TaskChecks(current?.tasks.orEmpty()) { task, done ->
-                        commit { repository.setTaskDone(task, done) }
+                        commit(block = { repository.setTaskDone(task, done) })
                     }
                     current?.entry?.wakeTime?.takeIf { it.isNotEmpty() }?.let {
                         Text("שעת השכמה שתכננת: $it")
@@ -146,7 +146,7 @@ private fun JournalApp(startEvening: Boolean) {
                 }
                 Screen.EVENING -> ScrollPage {
                     EveningPage(currentDate, current, tomorrow,
-                        onRoutine = { id, done -> commit { repository.setRoutineDone(currentDate, id, done) } },
+                        onRoutine = { id, done -> commit(block = { repository.setRoutineDone(currentDate, id, done) }) },
                         onSave = { summary, tasks, wake ->
                             commit({
                                 repository.saveSummary(currentDate, summary)
@@ -176,8 +176,8 @@ private fun JournalApp(startEvening: Boolean) {
                 Screen.DAY -> ScrollPage {
                     Text(selectedDate.format(hebrewDate), style = MaterialTheme.typography.titleLarge)
                     DayPage(selectedDate, selected,
-                        onRoutine = { id, done -> commit { repository.setRoutineDone(selectedDate, id, done) } },
-                        onTask = { task, done -> commit { repository.setTaskDone(task, done) } },
+                        onRoutine = { id, done -> commit(block = { repository.setRoutineDone(selectedDate, id, done) }) },
+                        onTask = { task, done -> commit(block = { repository.setTaskDone(task, done) }) },
                         onSave = { summary, tasks, wake ->
                             commit({
                                 repository.saveSummary(selectedDate, summary)
@@ -189,11 +189,11 @@ private fun JournalApp(startEvening: Boolean) {
                 }
                 Screen.ROUTINES -> ScrollPage {
                     RoutinesPage(templates,
-                        onAdd = { title -> commit { repository.addTemplate(title) } },
-                        onRename = { id, title -> commit { repository.renameTemplate(id, title) } },
-                        onRemove = { id -> commit { repository.removeTemplate(id) } },
-                        onRestore = { id -> commit { repository.restoreTemplate(id) } },
-                        onMove = { id, direction -> commit { repository.moveTemplate(id, direction) } },
+                        onAdd = { title -> commit(block = { repository.addTemplate(title) }) },
+                        onRename = { id, title -> commit(block = { repository.renameTemplate(id, title) }) },
+                        onRemove = { id -> commit(block = { repository.removeTemplate(id) }) },
+                        onRestore = { id -> commit(block = { repository.restoreTemplate(id) }) },
+                        onMove = { id, direction -> commit(block = { repository.moveTemplate(id, direction) }) },
                     )
                 }
             }
