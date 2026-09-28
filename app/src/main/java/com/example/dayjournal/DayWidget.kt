@@ -23,6 +23,7 @@ import androidx.glance.text.Text
 import androidx.glance.unit.ColorProvider
 import androidx.glance.text.TextStyle
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -41,7 +42,7 @@ class DayWidget : GlanceAppWidget() {
 
     @Composable
     private fun WidgetBody(dateLabel: String, routines: List<DayRoutine>) {
-        Column(modifier = GlanceModifier.fillMaxSize().background(Color.White).padding(12)) {
+        Column(modifier = GlanceModifier.fillMaxSize().background(Color.White).padding(12.dp)) {
             Text("היום · $dateLabel", style = TextStyle(color = ColorProvider(Color.Black), fontSize = 18.sp))
             if (routines.isEmpty()) Text("הוסף רוטינות באפליקציה")
             routines.forEach { routine ->
@@ -51,6 +52,7 @@ class DayWidget : GlanceAppWidget() {
                         actionParametersOf(routineKey to routine.routineId)
                     ),
                     text = routine.title,
+                    style = TextStyle(color = ColorProvider(Color.Black), fontSize = 16.sp),
                     maxLines = 1,
                 )
             }
